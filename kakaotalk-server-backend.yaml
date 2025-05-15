@@ -1,0 +1,12 @@
+# kakaotalk-server-backend.yaml
+name: kakaotalk-server-backend
+type: web
+image: node:22
+command: ["npm", "start"]
+port: 3000
+ingress:
+  enabled: true
+  # host 를 비워두면 <name>.<namespace>.cloudtype.app 가 자동 할당됩니다
+  hosts:
+    - host: ""
+      path: /
