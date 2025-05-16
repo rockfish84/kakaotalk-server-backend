@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// 1) 서비스 계정 JSON 로드
+// 서비스 계정 JSON 로드
 const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
@@ -40,8 +40,11 @@ app.post('/send', async (req, res) => {
     }
 
     const message = {
+        tokens: Array.from(deviceTokens),
         data: { type, content, emoticonRes: emoticonRes || '' },
-        tokens: Array.from(deviceTokens)
+        android: {
+            priority: 'high'    // ← High priority 지정
+        }
     };
 
     try {
