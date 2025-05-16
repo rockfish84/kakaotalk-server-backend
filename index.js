@@ -4,13 +4,13 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-// 서비스 계정 JSON 로드
+// 1) 서비스 계정 JSON 로드
 const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
 
-// 1) 올바른 프로젝트 ID가 로드됐는지 확인
+// 2) 로드된 project_id 확인 (로그)
 console.log('🔍 loaded serviceAccount.project_id =', serviceAccount.project_id);
 
-// 2) 하드코딩 덮어쓰기(환경변수가 틀릴 때 안전장치)
+// 3) (안전장치) 프로젝트 ID 하드코딩
 const PROJECT_ID = 'kakaotall-33df9';
 
 admin.initializeApp({
@@ -18,17 +18,17 @@ admin.initializeApp({
     projectId: PROJECT_ID
 });
 
-// 다시 한 번 확인
+// 4) 다시 한 번 Admin SDK에 설정된 projectId 확인
 console.log('🔍 admin.app().options.projectId =', admin.app().options.projectId);
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// 메모리 저장소 (실제론 DB 사용 권장)
+// 5) 메모리 저장소 (실제론 Redis/MySQL 같은 영속화 저장소 권장)
 const deviceTokens = new Set();
 
-// 토큰 등록
+// 6) 토큰 등록
 app.post('/register-token', (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: 'token is required' });
@@ -37,31 +37,32 @@ app.post('/register-token', (req, res) => {
     res.json({ success: true });
 });
 
-// 토큰 목록 조회
+// 7) 등록된 토큰 목록 조회
 app.get('/tokens', (req, res) => {
     res.json({ tokens: Array.from(deviceTokens) });
 });
 
-// 푸시 발송
+// 8) 푸시 발송 (sendAll 우회 버전)
 app.post('/send', async (req, res) => {
     const { type, content, emoticonRes } = req.body;
-    if (deviceTokens.size === 0) {
+    const tokens = Array.from(deviceTokens);
+    if (tokens.length === 0) {
         return res.status(400).json({ error: 'No device tokens registered' });
     }
 
-    const message = {
-        tokens: Array.from(deviceTokens),
+    // 개별 메시지 배열 생성
+    const messages = tokens.map(token => ({
+        token,
         data: { type, content, emoticonRes: emoticonRes || '' },
         android: { priority: 'high' }
-    };
+    }));
 
     try {
-        const response = await admin.messaging().sendMulticast(message);
-        console.log('✅ FCM response:', response);
+        const response = await admin.messaging().sendAll(messages);
+        console.log('✅ sendAll response:', response);
         res.json({ success: true, response });
     } catch (err) {
-        // 3) error.code 와 error.details 까지 모두 찍고 응답
-        console.error('❌ Error sending FCM:', {
+        console.error('❌ sendAll error:', {
             message: err.message,
             code: err.code,
             details: err.details
@@ -74,6 +75,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
+// 9) 서버 시작
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 FCM server listening on port ${PORT}`);
